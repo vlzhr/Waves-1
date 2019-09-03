@@ -37,9 +37,9 @@ object EvaluatorV1 {
   private def evalRef(key: String): EvalM[(EvaluationContext, EVALUATED)] =
     for {
       ctx <- get
-      r   <- lets.get(ctx).get(key) match {
+      r <- lets.get(ctx).get(key) match {
         case Some(lzy) => liftTER[EVALUATED](lzy.value)
-        case None => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$key' not found")
+        case None      => raiseError[LoggedEvaluationContext, ExecutionError, EVALUATED](s"A definition of '$key' not found")
       }
     } yield (ctx.ec, r)
 
@@ -51,12 +51,13 @@ object EvaluatorV1 {
     }
 
   private def evalGetter(expr: EXPR, field: String): EvalM[(EvaluationContext, EVALUATED)] = {
-    evalExprWithCtx(expr).flatMap { case (ctx, exprResult) =>
-      val fields = exprResult.asInstanceOf[CaseObj].fields
-      fields.get(field) match {
-        case Some(f) => (ctx, f).pure[EvalM]
-        case None    => raiseError(s"A definition of '$field' not found amongst ${fields.keys}")
-      }
+    evalExprWithCtx(expr).flatMap {
+      case (ctx, exprResult) =>
+        val fields = exprResult.asInstanceOf[CaseObj].fields
+        fields.get(field) match {
+          case Some(f) => (ctx, f).pure[EvalM]
+          case None    => raiseError(s"A definition of '$field' not found amongst ${fields.keys}")
+        }
     }
   }
 
@@ -126,11 +127,11 @@ object EvaluatorV1 {
   }
 
   def applyWithLogging[A <: EVALUATED](
-    c:    Either[ExecutionError, EvaluationContext],
-    expr: EXPR
+      c: Either[ExecutionError, EvaluationContext],
+      expr: EXPR
   ): (Log, Either[ExecutionError, A]) = {
     val log = ListBuffer[LogItem]()
-    val r = c.flatMap(ap(_, expr, (str: String) => (v: LetExecResult) => log.append((str, v))))
+    val r   = c.flatMap(ap(_, expr, (str: String) => (v: LetExecResult) => log.append((str, v))))
     (log.toList, r)
   }
 
@@ -145,12 +146,13 @@ object EvaluatorV1 {
   }
 
   def evalWithLogging(
-    ctx:   Either[ExecutionError, EvaluationContext],
-    evalC: EvalM[EVALUATED]
+      ctx: Either[ExecutionError, EvaluationContext],
+      evalC: EvalM[EVALUATED]
   ): (Log, Either[ExecutionError, EVALUATED]) = {
     val log = ListBuffer[LogItem]()
     val llc = (str: String) => (v: LetExecResult) => log.append((str, v))
-    val res = ctx.map(LoggedEvaluationContext(llc, _))
+    val res = ctx
+      .map(LoggedEvaluationContext(llc, _))
       .flatMap(evalC.run(_).value._2)
     (log.toList, res)
   }
